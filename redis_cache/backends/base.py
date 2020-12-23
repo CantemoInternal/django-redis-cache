@@ -1,4 +1,5 @@
 from functools import wraps
+import socket
 
 from django.core.cache.backends.base import (
     BaseCache, DEFAULT_TIMEOUT, InvalidCacheBackendError,
@@ -13,6 +14,7 @@ except ImportError:
     )
 
 from redis.connection import DefaultParser
+from redis.exceptions import ConnectionError
 from redis_cache.constants import KEY_EXPIRED, KEY_NON_VOLATILE
 from redis_cache.connection import pool
 from redis_cache.utils import get_servers, parse_connection_kwargs, import_class
@@ -27,7 +29,11 @@ def get_client(write=False):
             version = kwargs.pop('version', None)
             key = self.make_key(key, version=version)
             client = self.get_client(key, write=write)
-            return method(self, client, key, *args, **kwargs)
+            ignore_exceptions = (ConnectionError, socket.timeout)
+            try:
+                return method(self, client, key, *args, **kwargs)
+            except ignore_exceptions:
+                return None
 
         return wrapped
 
